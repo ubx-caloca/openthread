@@ -35,8 +35,8 @@ static void jsmn_fill_token(jsmntok_t *token, jsmntype_t type, int start, int en
  */
 static int jsmn_parse_primitive(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, size_t num_tokens)
 {
-    jsmntok_t *token;
-    unsigned int        start;
+    jsmntok_t *  token;
+    unsigned int start;
 
     start = parser->pos;
 
@@ -175,10 +175,10 @@ static int jsmn_parse_string(jsmn_parser *parser, const char *js, size_t len, js
  */
 int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, unsigned int num_tokens)
 {
-    int        r;
-    int        i;
-    jsmntok_t *token;
-    unsigned int        count = parser->toknext;
+    int          r;
+    int          i;
+    jsmntok_t *  token;
+    unsigned int count = parser->toknext;
 
     for (; parser->pos < len && js[parser->pos] != '\0'; parser->pos++)
     {

@@ -278,7 +278,8 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                     jsmn_parser parser;
                     jsmntok_t   tokens[APP_JSONPARSING_NUMTOKENS];
                     jsmn_init(&parser);
-                    int32_t numTokens = (int32_t)jsmn_parse(&parser, buf, strlen(buf), tokens, APP_JSONPARSING_NUMTOKENS);
+                    int32_t numTokens =
+                        (int32_t)jsmn_parse(&parser, buf, strlen(buf), tokens, APP_JSONPARSING_NUMTOKENS);
 
                     if (numTokens > 0)
                     {
@@ -332,10 +333,11 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                                         if (attrNameStart < 0 || attrNameEnd < 0)
                                             break;
                                         char attrValString[APP_MAXSTRING_ATTR];
-                                        getSubString(buf, (uint16_t)(tokens[i].start), (uint16_t)(tokens[i].end - tokens[i].start),
-                                                     attrValString);
+                                        getSubString(buf, (uint16_t)(tokens[i].start),
+                                                     (uint16_t)(tokens[i].end - tokens[i].start), attrValString);
                                         char attrNameString[APP_MAXSTRING_ATTR];
-                                        getSubString(buf, (uint16_t)attrNameStart, (uint16_t)(attrNameEnd - attrNameStart), attrNameString);
+                                        getSubString(buf, (uint16_t)attrNameStart,
+                                                     (uint16_t)(attrNameEnd - attrNameStart), attrNameString);
 
                                         // From here on, error when processing attr value is only a fail for that attr
                                         // in the json, continue with the other attrs
@@ -454,7 +456,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
         }
     }
 }
- 
+
 static void lightHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
     /* We ignore the message content */
