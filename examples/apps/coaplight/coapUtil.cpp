@@ -350,7 +350,7 @@ static void pingHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessa
             otError result;
             char    responseData[64];
             int     len = snprintf(responseData, sizeof(responseData) - 1, "%s", "{\"res\":\"pong\"}");
-            result      = otMessageAppend(replyMessage, responseData, len);
+            result      = otMessageAppend(replyMessage, responseData, (uint16_t)len);
 
             if (result == OT_ERROR_NONE)
             {
@@ -456,7 +456,7 @@ static void identityReplyHandler(struct CoapUtilHandlerContext *handlerContext,
         int  len = snprintf(response, sizeof(response) - 1, "{\"eui\":\"%x:%x:%x:%x:%x:%x:%x:%x\",\"ipaddr\":\"%s\"}",
                            extAddress.m8[0], extAddress.m8[1], extAddress.m8[2], extAddress.m8[3], extAddress.m8[4],
                            extAddress.m8[5], extAddress.m8[6], extAddress.m8[7], ippddrString);
-        result   = otMessageAppend(replyMessage, response, len);
+        result   = otMessageAppend(replyMessage, response, (uint16_t)len);
 
         if (result == OT_ERROR_NONE)
         {

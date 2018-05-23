@@ -221,8 +221,8 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
     {
         otError result;
         char    response[APP_RESPPAYLOAD_SIZE];
-        int16_t newToggleLevel     = -1;
-        int16_t newStep            = -1;
+        int32_t newToggleLevel     = -1;
+        int32_t newStep            = -1;
         bool    toggleLevelChanged = false;
         bool    stepChanged        = false;
         uint8_t status             = 0; // 0 -> Error, 1 -> Ok
@@ -278,7 +278,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                     jsmn_parser parser;
                     jsmntok_t   tokens[APP_JSONPARSING_NUMTOKENS];
                     jsmn_init(&parser);
-                    int16_t numTokens = jsmn_parse(&parser, buf, strlen(buf), tokens, APP_JSONPARSING_NUMTOKENS);
+                    int32_t numTokens = (int32_t)jsmn_parse(&parser, buf, strlen(buf), tokens, APP_JSONPARSING_NUMTOKENS);
 
                     if (numTokens > 0)
                     {
@@ -298,8 +298,8 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                             {
                                 // Checking the name values pairs of token to get values
                                 bool    tokenVal      = false;
-                                int16_t attrNameStart = -1;
-                                int16_t attrNameEnd   = -1;
+                                int32_t attrNameStart = -1;
+                                int32_t attrNameEnd   = -1;
                                 for (uint8_t i = 1; i < numTokens; i++)
                                 {
                                     if (!tokenVal)
@@ -311,8 +311,8 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                                         }
                                         else
                                         {
-                                            attrNameStart = tokens[i].start;
-                                            attrNameEnd   = tokens[i].end;
+                                            attrNameStart = (int32_t)tokens[i].start;
+                                            attrNameEnd   = (int32_t)tokens[i].end;
                                         }
                                         tokenVal = true;
                                     }
@@ -332,10 +332,10 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                                         if (attrNameStart < 0 || attrNameEnd < 0)
                                             break;
                                         char attrValString[APP_MAXSTRING_ATTR];
-                                        getSubString(buf, tokens[i].start, tokens[i].end - tokens[i].start,
+                                        getSubString(buf, (uint16_t)(tokens[i].start), (uint16_t)(tokens[i].end - tokens[i].start),
                                                      attrValString);
                                         char attrNameString[APP_MAXSTRING_ATTR];
-                                        getSubString(buf, attrNameStart, attrNameEnd - attrNameStart, attrNameString);
+                                        getSubString(buf, (uint16_t)attrNameStart, (uint16_t)(attrNameEnd - attrNameStart), attrNameString);
 
                                         // From here on, error when processing attr value is only a fail for that attr
                                         // in the json, continue with the other attrs
@@ -384,7 +384,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                     {
                         if (newStep != handlerContext->lights[0]->step)
                         {
-                            handlerContext->lights[0]->step = newStep;
+                            handlerContext->lights[0]->step = (uint8_t)newStep;
                             stepChanged                     = true;
                         }
                     }
@@ -392,7 +392,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                     {
                         if (newToggleLevel != handlerContext->lights[0]->toggleLevel)
                         {
-                            handlerContext->lights[0]->toggleLevel = newToggleLevel;
+                            handlerContext->lights[0]->toggleLevel = (uint8_t)newToggleLevel;
                             toggleLevelChanged                     = true;
                         }
                     }
@@ -438,7 +438,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                                (status == 1 ? "Ok" : "Error"), handlerContext->lights[0]->level);
             }
         }
-        result = otMessageAppend(replyMessage, response, len);
+        result = otMessageAppend(replyMessage, response, (uint16_t)len);
 
         if (result == OT_ERROR_NONE)
         {
@@ -454,7 +454,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
         }
     }
 }
-
+ 
 static void lightHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
     /* We ignore the message content */
