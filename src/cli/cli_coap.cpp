@@ -217,12 +217,12 @@ otError Coap::ProcessRequest(int argc, char *argv[])
     uint16_t      payloadLength = 0;
 
     // Default parameters
-    char         coapUri[kMaxUriLength] = "test";
-    otCoapType   coapType               = OT_COAP_TYPE_NON_CONFIRMABLE;
-    otCoapCode   coapCode               = OT_COAP_CODE_GET;
-    otIp6Address coapDestinationIp;
-    otCoapOptionContentFormat coapOptionContentFormat  = OT_COAP_OPTION_CONTENT_FORMAT_TEXT_PLAIN;
-    bool coapGotContentFormat = false;
+    char                      coapUri[kMaxUriLength] = "test";
+    otCoapType                coapType               = OT_COAP_TYPE_NON_CONFIRMABLE;
+    otCoapCode                coapCode               = OT_COAP_CODE_GET;
+    otIp6Address              coapDestinationIp;
+    otCoapOptionContentFormat coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_TEXT_PLAIN;
+    bool                      coapGotContentFormat    = false;
 
     VerifyOrExit(argc > 0, error = OT_ERROR_INVALID_ARGS);
 
@@ -305,45 +305,43 @@ otError Coap::ProcessRequest(int argc, char *argv[])
         // CoAP-Content Format
         if (strcmp(argv[5], "plain") == 0)
         {
-	    coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_TEXT_PLAIN;
-	    coapGotContentFormat = true;
+            coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_TEXT_PLAIN;
+            coapGotContentFormat    = true;
         }
         else if (strcmp(argv[5], "link") == 0)
         {
-	    coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_LINK_FORMAT;
-	    coapGotContentFormat = true;
+            coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_LINK_FORMAT;
+            coapGotContentFormat    = true;
         }
         else if (strcmp(argv[5], "xml") == 0)
         {
-	    coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_XML;
-	    coapGotContentFormat = true;
+            coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_XML;
+            coapGotContentFormat    = true;
         }
         else if (strcmp(argv[5], "octet") == 0)
         {
-	    coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_OCTET_STREAM;
-	    coapGotContentFormat = true;
+            coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_OCTET_STREAM;
+            coapGotContentFormat    = true;
         }
         else if (strcmp(argv[5], "exi") == 0)
         {
-	    coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_EXI;
-	    coapGotContentFormat = true;
+            coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_EXI;
+            coapGotContentFormat    = true;
         }
         else if (strcmp(argv[5], "json") == 0)
         {
-	    coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_JSON;
-	    coapGotContentFormat = true;
+            coapOptionContentFormat = OT_COAP_OPTION_CONTENT_FORMAT_JSON;
+            coapGotContentFormat    = true;
         }
         else
         {
             ExitNow(error = OT_ERROR_INVALID_ARGS);
         }
-	if(coapGotContentFormat)
+        if (coapGotContentFormat)
         {
             SuccessOrExit(error = otCoapHeaderAppendContentFormatOption(&header, coapOptionContentFormat));
         }
     }
-
-
 
     memset(&messageInfo, 0, sizeof(messageInfo));
     messageInfo.mPeerAddr    = coapDestinationIp;
