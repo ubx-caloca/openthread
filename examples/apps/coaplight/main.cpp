@@ -35,15 +35,13 @@
 #include <openthread/openthread.h>
 #include <openthread/platform/logging.h>
 
-
 #include "platform.h"
 
-//CC: Init prototypes
+// CC: Init prototypes
 otError coapUtilInit(otInstance *aInstance);
-void coapLightInit(otInstance *aInstance);
-void switchSimInit(otInstance *aInstance); 
-void switchSimCleanup(); 
-
+void    coapLightInit(otInstance *aInstance);
+void    switchSimInit(otInstance *aInstance);
+void    switchSimCleanup();
 
 #if OPENTHREAD_ENABLE_MULTIPLE_INSTANCES
 void *otPlatCAlloc(size_t aNum, size_t aSize)
@@ -116,7 +114,6 @@ pseudo_reset:
     return 0;
 }
 
-
 /*
  * Provide, if required an "otPlatLog()" function
  */
@@ -134,6 +131,3 @@ void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat
 }
 
 #endif
-
-
-

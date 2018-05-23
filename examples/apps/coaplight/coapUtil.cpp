@@ -29,18 +29,18 @@
 #include <openthread/config.h>
 
 #include <assert.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include <openthread/types.h>
 #include <openthread/coap.h>
 #include <openthread/openthread.h>
+#include <openthread/types.h>
 #include <openthread/platform/logging.h>
 
-#include <openthread/link.h>
 #include <openthread/cli.h>
 #include <openthread/ip6.h>
+#include <openthread/link.h>
 
 #include "common/encoding.hpp"
 
@@ -50,35 +50,34 @@ using ot::Encoding::BigEndian::HostSwap32;
 /**
  * Context information to be passed to our handlers.
  */
-struct CoapUtilHandlerContext {
+struct CoapUtilHandlerContext
+{
     otInstance *aInstance;
 };
 
 /**
  * The instance of our context information structure.
  */
-static struct CoapUtilHandlerContext utilContext =
-{
-    .aInstance = NULL
-};
+static struct CoapUtilHandlerContext utilContext = {.aInstance = NULL};
 
 /**
  * Our default handler, this will display a page for all requests.
  */
-static void defaultHandler(
-        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-        const otMessageInfo *aMessageInfo);
+static void defaultHandler(void *               aContext,
+                           otCoapHeader *       aHeader,
+                           otMessage *          aMessage,
+                           const otMessageInfo *aMessageInfo);
 
 ///**
 // * Handler for the RFC-6690 CoRE response payload.
 // */
-//static void coreHandler(
+// static void coreHandler(
 //        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
 //        const otMessageInfo *aMessageInfo);
 ///**
 // * Resource definition for the ambient light sensor.
 // */
-//static otCoapResource coreResource = {
+// static otCoapResource coreResource = {
 //    .mUriPath = ".well-known/core",
 //    .mHandler = &coreHandler,
 //    .mContext = (void*)&instanceContext,
@@ -88,60 +87,55 @@ static void defaultHandler(
 /**
  * Handler for the Ping path.
  */
-static void pingHandler(
-        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-        const otMessageInfo *aMessageInfo);
+static void pingHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 /**
  * Resource definition for the Ping path.
  */
-static otCoapResource pingResource = {
-    .mUriPath = "ping",
-    .mHandler = &pingHandler,
-    .mContext = (void*)&utilContext,
-    .mNext = NULL
-};
+static otCoapResource pingResource = {.mUriPath = "ping",
+                                      .mHandler = &pingHandler,
+                                      .mContext = (void *)&utilContext,
+                                      .mNext    = NULL};
 
 /**
  * Handler for the Identity path.
  */
-static void identityHandler(
-        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-        const otMessageInfo *aMessageInfo);
+static void identityHandler(void *               aContext,
+                            otCoapHeader *       aHeader,
+                            otMessage *          aMessage,
+                            const otMessageInfo *aMessageInfo);
 /**
  * Resource definition for the Identity path.
  */
-static otCoapResource identityResource = {
-    .mUriPath = "ident",
-    .mHandler = &identityHandler,
-    .mContext = (void*)&utilContext,
-    .mNext = NULL
-};
+static otCoapResource identityResource = {.mUriPath = "ident",
+                                          .mHandler = &identityHandler,
+                                          .mContext = (void *)&utilContext,
+                                          .mNext    = NULL};
 
 otError coapUtilInit(otInstance *aInstance)
 {
     utilContext.aInstance = aInstance;
-    otCoapSetDefaultHandler(aInstance, &defaultHandler, (void*)&utilContext);
+    otCoapSetDefaultHandler(aInstance, &defaultHandler, (void *)&utilContext);
     otCoapAddResource(aInstance, &pingResource);
     otCoapAddResource(aInstance, &identityResource);
-    //otCoapAddResource(aInstance, &coreResource);
+    // otCoapAddResource(aInstance, &coreResource);
     return otCoapStart(aInstance, OT_DEFAULT_COAP_PORT);
 }
 
-static void defaultHandler(
-        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-        const otMessageInfo *aMessageInfo)
+static void defaultHandler(void *               aContext,
+                           otCoapHeader *       aHeader,
+                           otMessage *          aMessage,
+                           const otMessageInfo *aMessageInfo)
 {
     /* We ignore the message content */
     (void)aMessage;
 
     /* Pick up our context passed in earlier */
-    struct CoapUtilHandlerContext *handlerContext =
-        (struct CoapUtilHandlerContext*)aContext;
+    struct CoapUtilHandlerContext *handlerContext = (struct CoapUtilHandlerContext *)aContext;
 
     otPlatLog(OT_LOG_LEVEL_INFO, OT_LOG_REGION_COAP, "CC: Defaul handler coap entered");
-//#if OPENTHREAD_CONFIG_LOG_API == 1
-//	otLogInfoApi(handlerContext->aInstance, "CC: Defaul handler coap entered");
-//#endif
+    //#if OPENTHREAD_CONFIG_LOG_API == 1
+    //	otLogInfoApi(handlerContext->aInstance, "CC: Defaul handler coap entered");
+    //#endif
 
     /*
      * The default handler.  We need to know:
@@ -160,72 +154,57 @@ static void defaultHandler(
         return;
     }
 
-    switch (otCoapHeaderGetCode(aHeader)) {
-        case OT_COAP_CODE_GET:   /* A GET request */
+    switch (otCoapHeaderGetCode(aHeader))
+    {
+    case OT_COAP_CODE_GET: /* A GET request */
+    {
+        /*
+         * In our case, we don't care about the message, we just
+         * send a reply.  We need to copy the message ID and token
+         * from the original message.  The reply is an ACK with
+         * content, so we set the payload marker to indicate this.
+         */
+        otCoapHeader replyHeader;
+        otMessage *  replyMessage;
+
+        otCoapHeaderInit(&replyHeader, OT_COAP_TYPE_ACKNOWLEDGMENT, OT_COAP_CODE_CONTENT);
+
+        otCoapHeaderSetToken(&replyHeader, otCoapHeaderGetToken(aHeader), otCoapHeaderGetTokenLength(aHeader));
+
+        otCoapHeaderSetMessageId(&replyHeader, otCoapHeaderGetMessageId(aHeader));
+        otCoapHeaderAppendContentFormatOption(&replyHeader, OT_COAP_OPTION_CONTENT_FORMAT_TEXT_PLAIN);
+
+        otCoapHeaderSetPayloadMarker(&replyHeader);
+
+        replyMessage = otCoapNewMessage(handlerContext->aInstance, &replyHeader);
+
+        if (replyMessage)
+        {
+            otError result;
+            /* Our reply is tacked onto the end. */
+            result = otMessageAppend(replyMessage, "Hello World", 11);
+
+            if (result == OT_ERROR_NONE)
             {
-                /*
-                 * In our case, we don't care about the message, we just
-                 * send a reply.  We need to copy the message ID and token
-                 * from the original message.  The reply is an ACK with
-                 * content, so we set the payload marker to indicate this.
-                 */
-                otCoapHeader replyHeader;
-                otMessage *replyMessage;
-
-                otCoapHeaderInit(
-                        &replyHeader,
-                        OT_COAP_TYPE_ACKNOWLEDGMENT,
-                        OT_COAP_CODE_CONTENT
-                );
-
-                otCoapHeaderSetToken(&replyHeader,
-                        otCoapHeaderGetToken(aHeader),
-                        otCoapHeaderGetTokenLength(aHeader)
-                );
-
-                otCoapHeaderSetMessageId(
-                        &replyHeader,
-                        otCoapHeaderGetMessageId(aHeader)
-                );
-		otCoapHeaderAppendContentFormatOption(&replyHeader, OT_COAP_OPTION_CONTENT_FORMAT_TEXT_PLAIN);
-
-                otCoapHeaderSetPayloadMarker(&replyHeader);
-
-                replyMessage = otCoapNewMessage(
-                        handlerContext->aInstance, &replyHeader
-                );
-
-                if (replyMessage)
-                {
-                    otError result;
-                    /* Our reply is tacked onto the end. */
-                    result = otMessageAppend(replyMessage,
-                            "Hello World", 11);
-
-                    if (result == OT_ERROR_NONE)
-                    {
-                        /* All good, now send it */
-                        result = otCoapSendResponse(
-                                handlerContext->aInstance, replyMessage,
-                                aMessageInfo);
-			otCliUartOutputFormat("Got COAP message to default handler, replying 'hello world'");
-                    }
-
-                    if (result != OT_ERROR_NONE)
-                    {
-                        /* There was an issue above, free up the message */
-                        otMessageFree(replyMessage);
-                    }
-                }
+                /* All good, now send it */
+                result = otCoapSendResponse(handlerContext->aInstance, replyMessage, aMessageInfo);
+                otCliUartOutputFormat("Got COAP message to default handler, replying 'hello world'");
             }
-            break;
-        default:
-            break;
+
+            if (result != OT_ERROR_NONE)
+            {
+                /* There was an issue above, free up the message */
+                otMessageFree(replyMessage);
+            }
+        }
+    }
+    break;
+    default:
+        break;
     }
 }
 
-
-//static void coreHandler(
+// static void coreHandler(
 //        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
 //        const otMessageInfo *aMessageInfo)
 //{
@@ -324,89 +303,72 @@ static void defaultHandler(
 //    }
 //}
 
-static void pingHandler(
-        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-        const otMessageInfo *aMessageInfo)
+static void pingHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
     /* Ignore message */
     (void)aMessage;
 
     /* Pick up our context passed in earlier */
-    struct CoapUtilHandlerContext *handlerContext =
-        (struct CoapUtilHandlerContext*)aContext;
+    struct CoapUtilHandlerContext *handlerContext = (struct CoapUtilHandlerContext *)aContext;
 
     otPlatLog(OT_LOG_LEVEL_INFO, OT_LOG_REGION_COAP, "CC: Ping handler coap entered");
-//#if OPENTHREAD_CONFIG_LOG_API == 1
-//	otLogInfoApi(handlerContext->aInstance, "CC: ping handler coap entered");
-//#endif
+    //#if OPENTHREAD_CONFIG_LOG_API == 1
+    //	otLogInfoApi(handlerContext->aInstance, "CC: ping handler coap entered");
+    //#endif
 
     if (otCoapHeaderGetType(aHeader) != OT_COAP_TYPE_CONFIRMABLE)
     {
         /* Not a confirmable request, so ignore it. */
         return;
     }
-    switch (otCoapHeaderGetCode(aHeader)) {
-        case OT_COAP_CODE_GET:   /* A GET request */
+    switch (otCoapHeaderGetCode(aHeader))
+    {
+    case OT_COAP_CODE_GET: /* A GET request */
+    {
+        /*
+         * In our case, we don't care about the message, we just
+         * send a reply.  We need to copy the message ID and token
+         * from the original message, and set the payload marker.
+         */
+        otCoapHeader replyHeader;
+        otMessage *  replyMessage;
+
+        otCoapHeaderInit(&replyHeader, OT_COAP_TYPE_ACKNOWLEDGMENT, OT_COAP_CODE_CONTENT);
+
+        otCoapHeaderSetToken(&replyHeader, otCoapHeaderGetToken(aHeader), otCoapHeaderGetTokenLength(aHeader));
+
+        otCoapHeaderSetMessageId(&replyHeader, otCoapHeaderGetMessageId(aHeader));
+
+        otCoapHeaderAppendContentFormatOption(&replyHeader, OT_COAP_OPTION_CONTENT_FORMAT_JSON);
+
+        otCoapHeaderSetPayloadMarker(&replyHeader);
+
+        replyMessage = otCoapNewMessage(handlerContext->aInstance, &replyHeader);
+
+        if (replyMessage)
+        {
+            otError result;
+            char    responseData[64];
+            int     len = snprintf(responseData, sizeof(responseData) - 1, "%s", "{\"res\":\"pong\"}");
+            result      = otMessageAppend(replyMessage, responseData, len);
+
+            if (result == OT_ERROR_NONE)
             {
-                /*
-                 * In our case, we don't care about the message, we just
-                 * send a reply.  We need to copy the message ID and token
-                 * from the original message, and set the payload marker.
-                 */
-                otCoapHeader replyHeader;
-                otMessage *replyMessage;
-
-                otCoapHeaderInit(
-                        &replyHeader,
-                        OT_COAP_TYPE_ACKNOWLEDGMENT,
-                        OT_COAP_CODE_CONTENT
-                );
-
-                otCoapHeaderSetToken(&replyHeader,
-                        otCoapHeaderGetToken(aHeader),
-                        otCoapHeaderGetTokenLength(aHeader)
-                );
-
-                otCoapHeaderSetMessageId(
-                        &replyHeader,
-                        otCoapHeaderGetMessageId(aHeader)
-                );
-
-		otCoapHeaderAppendContentFormatOption(&replyHeader, OT_COAP_OPTION_CONTENT_FORMAT_JSON);
-
-                otCoapHeaderSetPayloadMarker(&replyHeader);
-
-                replyMessage = otCoapNewMessage(
-                        handlerContext->aInstance, &replyHeader);
-
-                if (replyMessage)
-                {
-                    otError result;
-                    char responseData[64];
-                    int len = snprintf(responseData, sizeof(responseData)-1,
-                            "%s", "{\"res\":\"pong\"}");
-                    result = otMessageAppend(replyMessage,
-                            responseData, len);
-
-                    if (result == OT_ERROR_NONE)
-                    {
-                        /* All good, now send it */
-                        result = otCoapSendResponse(
-                                handlerContext->aInstance, replyMessage,
-                                aMessageInfo);
-			otCliUartOutputFormat("Got COAP message /ping, replying 'pong'");
-                    }
-
-                    if (result != OT_ERROR_NONE)
-                    {
-                        /* There was an issue above, free up the message */
-                        otMessageFree(replyMessage);
-                    }
-                }
+                /* All good, now send it */
+                result = otCoapSendResponse(handlerContext->aInstance, replyMessage, aMessageInfo);
+                otCliUartOutputFormat("Got COAP message /ping, replying 'pong'");
             }
-            break;
-        default:
-            break;
+
+            if (result != OT_ERROR_NONE)
+            {
+                /* There was an issue above, free up the message */
+                otMessageFree(replyMessage);
+            }
+        }
+    }
+    break;
+    default:
+        break;
     }
 }
 
@@ -415,35 +377,26 @@ static void pingHandler(
  * to do it a few times.
  */
 static void identityReplyHandler(struct CoapUtilHandlerContext *handlerContext,
-        otCoapHeader *aHeader, const otMessageInfo *aMessageInfo)
+                                 otCoapHeader *                 aHeader,
+                                 const otMessageInfo *          aMessageInfo)
 {
     otCoapHeader replyHeader;
-    otMessage *replyMessage;
+    otMessage *  replyMessage;
 
     /*
      * Reply is an ACK with content to come
      */
-    otCoapHeaderInit(
-            &replyHeader,
-            OT_COAP_TYPE_ACKNOWLEDGMENT,
-            OT_COAP_CODE_CONTENT
-    );
+    otCoapHeaderInit(&replyHeader, OT_COAP_TYPE_ACKNOWLEDGMENT, OT_COAP_CODE_CONTENT);
 
     /*
      * Copy the token from the request header
      */
-    otCoapHeaderSetToken(&replyHeader,
-            otCoapHeaderGetToken(aHeader),
-            otCoapHeaderGetTokenLength(aHeader)
-    );
+    otCoapHeaderSetToken(&replyHeader, otCoapHeaderGetToken(aHeader), otCoapHeaderGetTokenLength(aHeader));
 
     /*
      * Copy the message ID from the request header
      */
-    otCoapHeaderSetMessageId(
-            &replyHeader,
-            otCoapHeaderGetMessageId(aHeader)
-    );
+    otCoapHeaderSetMessageId(&replyHeader, otCoapHeaderGetMessageId(aHeader));
 
     /*
      * Set the Content Format option to JSON
@@ -456,85 +409,60 @@ static void identityReplyHandler(struct CoapUtilHandlerContext *handlerContext,
      */
     otCoapHeaderSetPayloadMarker(&replyHeader);
 
-    replyMessage = otCoapNewMessage(
-            handlerContext->aInstance, &replyHeader
-    );
+    replyMessage = otCoapNewMessage(handlerContext->aInstance, &replyHeader);
 
     if (replyMessage)
     {
         otError result;
 
-//        /*
-//         * Convert to hexadecimal and append the message.  Do not include the
-//         * terminating NULL byte in the payload.
-//         */
-//        char response[32];
-//        int len = snprintf(response, sizeof(response)-1,
-//                "%x", (char)handlerContext->leds);
-//        result = otMessageAppend(
-//                replyMessage, response, len
-//        );
+        //        /*
+        //         * Convert to hexadecimal and append the message.  Do not include the
+        //         * terminating NULL byte in the payload.
+        //         */
+        //        char response[32];
+        //        int len = snprintf(response, sizeof(response)-1,
+        //                "%x", (char)handlerContext->leds);
+        //        result = otMessageAppend(
+        //                replyMessage, response, len
+        //        );
 
         otExtAddress extAddress;
         otLinkGetFactoryAssignedIeeeEui64(handlerContext->aInstance, &extAddress);
 
-        const otNetifAddress* addrs = otIp6GetUnicastAddresses(handlerContext->aInstance);
+        const otNetifAddress *addrs = otIp6GetUnicastAddresses(handlerContext->aInstance);
 
-	char ippddrString[64];
-	ippddrString[0]='\0';
-	otCliUartOutputFormat("Printing ipddr");
+        char ippddrString[64];
+        ippddrString[0] = '\0';
+        otCliUartOutputFormat("Printing ipddr");
         for (const otNetifAddress *addr = addrs; addr; addr = addr->mNext)
         {
-            if(addr->mScopeOverride == 3 && addr->mRloc == false){
+            if (addr->mScopeOverride == 3 && addr->mRloc == false)
+            {
+                snprintf(ippddrString, sizeof(ippddrString) - 1, "%x:%x:%x:%x:%x:%x:%x:%x",
+                         HostSwap16(addr->mAddress.mFields.m16[0]), HostSwap16(addr->mAddress.mFields.m16[1]),
+                         HostSwap16(addr->mAddress.mFields.m16[2]), HostSwap16(addr->mAddress.mFields.m16[3]),
+                         HostSwap16(addr->mAddress.mFields.m16[4]), HostSwap16(addr->mAddress.mFields.m16[5]),
+                         HostSwap16(addr->mAddress.mFields.m16[6]), HostSwap16(addr->mAddress.mFields.m16[7]));
 
-	        snprintf(ippddrString, sizeof(ippddrString)-1,
-                  "%x:%x:%x:%x:%x:%x:%x:%x",
-		  HostSwap16(addr->mAddress.mFields.m16[0]), 
-		  HostSwap16(addr->mAddress.mFields.m16[1]),
-		  HostSwap16(addr->mAddress.mFields.m16[2]),
-		  HostSwap16(addr->mAddress.mFields.m16[3]),
-		  HostSwap16(addr->mAddress.mFields.m16[4]),
-		  HostSwap16(addr->mAddress.mFields.m16[5]),
-		  HostSwap16(addr->mAddress.mFields.m16[6]),
-		  HostSwap16(addr->mAddress.mFields.m16[7]));
+                otCliUartOutputFormat("Ip: "
+                                      "(%s,mPrefixLength=%d,mPreferred=%d,valid=%d,mScopeOverrideValid=%d,"
+                                      "mScopeOverride=%d,mRloc=%d,)",
+                                      ippddrString, addr->mPrefixLength, addr->mPreferred, addr->mValid,
+                                      addr->mScopeOverrideValid, addr->mScopeOverride, addr->mRloc);
+            }
+        }
 
-	        otCliUartOutputFormat("Ip: (%s,mPrefixLength=%d,mPreferred=%d,valid=%d,mScopeOverrideValid=%d,mScopeOverride=%d,mRloc=%d,)", 
-                    ippddrString, 
-                    addr->mPrefixLength,
-                    addr->mPreferred, 
-                    addr->mValid, 
-                    addr->mScopeOverrideValid, 
-                    addr->mScopeOverride, 
-                    addr->mRloc);
-            }    
-	}
-
-
-
-	char response[200];
-	int len = snprintf(response, sizeof(response)-1,
-                "{\"eui\":\"%x:%x:%x:%x:%x:%x:%x:%x\",\"ipaddr\":\"%s\"}",
-		extAddress.m8[0], 
-		extAddress.m8[1],
-		extAddress.m8[2],
-		extAddress.m8[3],
-		extAddress.m8[4],
-		extAddress.m8[5],
-		extAddress.m8[6],
-		extAddress.m8[7],
-		ippddrString);
-	result = otMessageAppend(
-                replyMessage, response, len
-	);
+        char response[200];
+        int  len = snprintf(response, sizeof(response) - 1, "{\"eui\":\"%x:%x:%x:%x:%x:%x:%x:%x\",\"ipaddr\":\"%s\"}",
+                           extAddress.m8[0], extAddress.m8[1], extAddress.m8[2], extAddress.m8[3], extAddress.m8[4],
+                           extAddress.m8[5], extAddress.m8[6], extAddress.m8[7], ippddrString);
+        result   = otMessageAppend(replyMessage, response, len);
 
         if (result == OT_ERROR_NONE)
         {
             /* All good, now send it */
-            result = otCoapSendResponse(
-                    handlerContext->aInstance, replyMessage,
-                    aMessageInfo
-            );
-	   otCliUartOutputFormat("Got COAP message /ident, replying '%s'", response);
+            result = otCoapSendResponse(handlerContext->aInstance, replyMessage, aMessageInfo);
+            otCliUartOutputFormat("Got COAP message /ident, replying '%s'", response);
         }
 
         if (result != OT_ERROR_NONE)
@@ -545,16 +473,16 @@ static void identityReplyHandler(struct CoapUtilHandlerContext *handlerContext,
     }
 }
 
-static void identityHandler(
-        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-        const otMessageInfo *aMessageInfo)
+static void identityHandler(void *               aContext,
+                            otCoapHeader *       aHeader,
+                            otMessage *          aMessage,
+                            const otMessageInfo *aMessageInfo)
 {
     /* We ignore the message content */
     (void)aMessage;
 
     /* Pick up our context passed in earlier */
-    struct CoapUtilHandlerContext *handlerContext =
-        (struct CoapUtilHandlerContext*)aContext;
+    struct CoapUtilHandlerContext *handlerContext = (struct CoapUtilHandlerContext *)aContext;
 
     if (otCoapHeaderGetType(aHeader) != OT_COAP_TYPE_CONFIRMABLE)
     {
@@ -562,13 +490,12 @@ static void identityHandler(
         return;
     }
 
-    switch (otCoapHeaderGetCode(aHeader)) {
-        case OT_COAP_CODE_GET:   /* A GET request */
-            identityReplyHandler(handlerContext, aHeader, aMessageInfo);
-            break;
-        default:
-            break;
+    switch (otCoapHeaderGetCode(aHeader))
+    {
+    case OT_COAP_CODE_GET: /* A GET request */
+        identityReplyHandler(handlerContext, aHeader, aMessageInfo);
+        break;
+    default:
+        break;
     }
 }
-
-
