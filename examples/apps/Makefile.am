@@ -33,6 +33,7 @@ include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 DIST_SUBDIRS                            = \
     cli                                   \
     ncp                                   \
+    coaplight                             \
     $(NULL)
 
 # Always build (e.g. for 'make all') these subdirectories.
@@ -48,11 +49,16 @@ if OPENTHREAD_ENABLE_NCP
 SUBDIRS                                += ncp
 endif
 
+if OPENTHREAD_ENABLE_COAPLIGHT
+SUBDIRS                                += coaplight
+endif
+
 # Always pretty (e.g. for 'make pretty') these subdirectories.
 
 PRETTY_SUBDIRS                          = \
     cli                                   \
     ncp                                   \
+    coaplight                             \
     $(NULL)
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

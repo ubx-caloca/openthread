@@ -66,6 +66,7 @@ configure_OPTIONS                   = \
     --enable-tmf-proxy                \
     --with-examples=posix             \
     --with-ncp-bus=uart               \
+    --enable-coaplight-app=all        \
     $(NULL)
 
 TopSourceDir                   := $(dir $(shell readlink $(firstword $(MAKEFILE_LIST))))..

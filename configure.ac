@@ -422,6 +422,54 @@ AC_SUBST(OPENTHREAD_ENABLE_CLI_MTD)
 
 
 #
+# COAP LIGHT app
+#
+AC_ARG_ENABLE(coaplight-app,
+    [AS_HELP_STRING([--enable-coaplight-app],[Enable a simple COAP LIGHT app support (no|mtd|ftd|all) @<:@default=no@:>@.])],
+    [
+        case "${enableval}" in
+        all|both)
+            enable_coaplight_app=yes
+            enable_coaplight_app_mtd=yes
+            enable_coaplight_app_ftd=yes
+            ;;
+        no|yes)
+            enable_coaplight_app=${enableval}
+            enable_coaplight_app_mtd=${enableval}
+            enable_coaplight_app_ftd=${enableval}
+            ;;
+        mtd)
+            enable_coaplight_app=yes
+            enable_coaplight_app_mtd=yes
+            enable_coaplight_app_ftd=no
+            ;;
+        ftd)
+            enable_coaplight_app=yes
+            enable_coaplight_app_mtd=no
+            enable_coaplight_app_ftd=yes
+            ;;
+        *)
+            AC_MSG_ERROR([Invalid value ${enableval} for --enable-coapexample-app])
+            ;;
+        esac
+    ],
+    [
+     enable_coaplight_app=no
+     enable_coaplight_app_mtd=no
+     enable_coaplight_app_ftd=no])
+
+
+AC_MSG_CHECKING([coaplight-app modes])
+AC_MSG_RESULT(${enable_coaplight_app})
+AM_CONDITIONAL([OPENTHREAD_ENABLE_COAPLIGHT],     [test "${enable_coaplight_app}" == "yes"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_COAPLIGHT_MTD], [test "${enable_coaplight_app_mtd}" == "yes"])
+AM_CONDITIONAL([OPENTHREAD_ENABLE_COAPLIGHT_FTD], [test "${enable_coaplight_app_ftd}" == "yes"])
+AC_SUBST(OPENTHREAD_ENABLE_COAPLIGHT)
+AC_SUBST(OPENTHREAD_ENABLE_COAPLIGHT_FTD)
+AC_SUBST(OPENTHREAD_ENABLE_COAPLIGHT_MTD)
+
+
+#
 # NCP app
 #
 AC_ARG_ENABLE(ncp-app,
@@ -1547,6 +1595,7 @@ examples/Makefile
 examples/apps/Makefile
 examples/apps/cli/Makefile
 examples/apps/ncp/Makefile
+examples/apps/coaplight/Makefile
 examples/platforms/Makefile
 examples/platforms/cc2538/Makefile
 examples/platforms/cc2650/Makefile
@@ -1636,6 +1685,9 @@ AC_MSG_NOTICE([
   OpenThread NCP support                    : ${enable_ncp_app}
   OpenThread NCP-MTD support                : ${enable_ncp_app_mtd}
   OpenThread NCP-FTD support                : ${enable_ncp_app_ftd}
+  OpenThread COAPLIGHT support              : ${enable_coaplight_app}
+  OpenThread COAPLIGHT-MTD support          : ${enable_coaplight_app_mtd}
+  OpenThread COAPLIGHT-FTD support          : ${enable_coaplight_app_ftd}
   OpenThread NCP-BUS Configuration          : ${with_ncp_bus}
   OpenThread NCP Vendor Hook Source         : ${with_ncp_vendor_hook_source}
   OpenThread NCP Spinel Encrypter           : ${with_ncp_spinel_encrypter_libs}

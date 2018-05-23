@@ -47,6 +47,10 @@ if OPENTHREAD_ENABLE_CLI
 SUBDIRS                                += cli
 endif
 
+if OPENTHREAD_ENABLE_COAPLIGHT
+SUBDIRS                                += cli
+endif
+
 if OPENTHREAD_ENABLE_NCP
 SUBDIRS                                += ncp
 endif

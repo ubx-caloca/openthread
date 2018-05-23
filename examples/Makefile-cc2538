@@ -48,6 +48,8 @@ configure_OPTIONS               = \
     --enable-diag                 \
     --with-examples=cc2538        \
     --enable-linker-map           \
+    --enable-application-coap     \
+    --enable-coaplight-app=all    \
     $(NULL)
 
 TopSourceDir                    := $(dir $(shell readlink $(firstword $(MAKEFILE_LIST))))..
