@@ -81,7 +81,7 @@ found:
         parser->pos = start;
         return JSMN_ERROR_NOMEM;
     }
-    jsmn_fill_token(token, JSMN_PRIMITIVE, start, parser->pos);
+    jsmn_fill_token(token, JSMN_PRIMITIVE, (int)start, (int)parser->pos);
 #ifdef JSMN_PARENT_LINKS
     token->parent = parser->toksuper;
 #endif
@@ -118,7 +118,7 @@ static int jsmn_parse_string(jsmn_parser *parser, const char *js, size_t len, js
                 parser->pos = start;
                 return JSMN_ERROR_NOMEM;
             }
-            jsmn_fill_token(token, JSMN_STRING, start + 1, parser->pos);
+            jsmn_fill_token(token, JSMN_STRING, (int)(start + 1), (int)parser->pos);
 #ifdef JSMN_PARENT_LINKS
             token->parent = parser->toksuper;
 #endif
@@ -206,7 +206,7 @@ int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *token
 #endif
             }
             token->type      = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY);
-            token->start     = (unsigned int)parser->pos;
+            token->start     = (int)parser->pos;
             parser->toksuper = (int)(parser->toknext - 1);
             break;
         case '}':
@@ -365,7 +365,7 @@ int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *token
         }
     }
 
-    return count;
+    return (int)count;
 }
 
 /**
