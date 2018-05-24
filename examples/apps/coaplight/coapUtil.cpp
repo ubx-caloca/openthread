@@ -44,6 +44,9 @@
 
 #include "common/encoding.hpp"
 
+#define APP_RESPPAYLOAD_SIZE 200
+#define APP_IPSTRING_SIZE 64
+
 using ot::Encoding::BigEndian::HostSwap16;
 using ot::Encoding::BigEndian::HostSwap32;
 
@@ -67,27 +70,11 @@ static void defaultHandler(void *               aContext,
                            otCoapHeader *       aHeader,
                            otMessage *          aMessage,
                            const otMessageInfo *aMessageInfo);
-
-///**
-// * Handler for the RFC-6690 CoRE response payload.
-// */
-// static void coreHandler(
-//        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-//        const otMessageInfo *aMessageInfo);
-///**
-// * Resource definition for the ambient light sensor.
-// */
-// static otCoapResource coreResource = {
-//    .mUriPath = ".well-known/core",
-//    .mHandler = &coreHandler,
-//    .mContext = (void*)&instanceContext,
-//    .mNext = NULL
-//};
-
 /**
  * Handler for the Ping path.
  */
 static void pingHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessage, const otMessageInfo *aMessageInfo);
+
 /**
  * Resource definition for the Ping path.
  */
@@ -95,7 +82,6 @@ static otCoapResource pingResource = {.mUriPath = "ping",
                                       .mHandler = &pingHandler,
                                       .mContext = (void *)&utilContext,
                                       .mNext    = NULL};
-
 /**
  * Handler for the Identity path.
  */
@@ -117,7 +103,6 @@ otError coapUtilInit(otInstance *aInstance)
     otCoapSetDefaultHandler(aInstance, &defaultHandler, (void *)&utilContext);
     otCoapAddResource(aInstance, &pingResource);
     otCoapAddResource(aInstance, &identityResource);
-    // otCoapAddResource(aInstance, &coreResource);
     return otCoapStart(aInstance, OT_DEFAULT_COAP_PORT);
 }
 
@@ -131,11 +116,6 @@ static void defaultHandler(void *               aContext,
 
     /* Pick up our context passed in earlier */
     struct CoapUtilHandlerContext *handlerContext = (struct CoapUtilHandlerContext *)aContext;
-
-    otPlatLog(OT_LOG_LEVEL_INFO, OT_LOG_REGION_COAP, "CC: Defaul handler coap entered");
-    //#if OPENTHREAD_CONFIG_LOG_API == 1
-    //	otLogInfoApi(handlerContext->aInstance, "CC: Defaul handler coap entered");
-    //#endif
 
     /*
      * The default handler.  We need to know:
@@ -181,14 +161,16 @@ static void defaultHandler(void *               aContext,
         if (replyMessage)
         {
             otError result;
-            /* Our reply is tacked onto the end. */
+            /*
+             * Constructing the payload of the response, a simple string "Hello World"
+             */
             result = otMessageAppend(replyMessage, "Hello World", 11);
 
             if (result == OT_ERROR_NONE)
             {
                 /* All good, now send it */
                 result = otCoapSendResponse(handlerContext->aInstance, replyMessage, aMessageInfo);
-                otCliUartOutputFormat("Got COAP message to default handler, replying 'hello world'");
+                otCliUartOutputFormat("Got COAP message in default handler, replying 'Hello World'");
             }
 
             if (result != OT_ERROR_NONE)
@@ -204,105 +186,6 @@ static void defaultHandler(void *               aContext,
     }
 }
 
-// static void coreHandler(
-//        void *aContext, otCoapHeader *aHeader, otMessage *aMessage,
-//        const otMessageInfo *aMessageInfo)
-//{
-//    /* Ignore message */
-//    (void)aMessage;
-//
-//    /* Pick up our context passed in earlier */
-//    struct CoapHandlerContext *handlerContext =
-//        (struct CoapHandlerContext*)aContext;
-//
-//    if (otCoapHeaderGetType(aHeader) != OT_COAP_TYPE_CONFIRMABLE)
-//    {
-//        /* Not a confirmable request, so ignore it. */
-//        return;
-//    }
-//
-//    switch (otCoapHeaderGetCode(aHeader)) {
-//        case OT_COAP_CODE_GET:   /* A GET request */
-//            {
-//                /*
-//                 * In our case, we don't care about the message, we just
-//                 * send a reply.  We need to copy the message ID and token
-//                 * from the original message, and set the payload marker.
-//                 *
-//                 * For this special endpoint, we also set the content format.
-//                 */
-//                otError result;
-//                otCoapHeader replyHeader;
-//                otMessage *replyMessage = NULL;
-//
-//                otCoapHeaderInit(
-//                        &replyHeader,
-//                        OT_COAP_TYPE_ACKNOWLEDGMENT,
-//                        OT_COAP_CODE_CONTENT
-//                );
-//
-//                otCoapHeaderSetToken(&replyHeader,
-//                        otCoapHeaderGetToken(aHeader),
-//                        otCoapHeaderGetTokenLength(aHeader)
-//                );
-//
-//                otCoapHeaderSetMessageId(
-//                        &replyHeader,
-//                        otCoapHeaderGetMessageId(aHeader)
-//                );
-//
-//                /*
-//                 * Setting the content format.  This must be done *before*
-//                 * setting the payload marker.
-//                 */
-//                result = otCoapHeaderAppendContentFormatOption(
-//                        &replyHeader,
-//                        OT_COAP_OPTION_CONTENT_FORMAT_LINK_FORMAT
-//                );
-//
-//                if (result == OT_ERROR_NONE) {
-//                    otCoapHeaderSetPayloadMarker(&replyHeader);
-//
-//                    replyMessage = otCoapNewMessage(
-//                            handlerContext->aInstance, &replyHeader);
-//                }
-//
-//                if (replyMessage)
-//                {
-//                    static const char responseData[] =
-//                        "</leds>;type=text/plain;title=\"LEDs control.  "
-//                        "GET this URI to see the state of the LEDs as a hex "
-//                        "bit mask, POST 0x (where x = hex bitmask) to turn "
-//                        "LEDs off, POST 1x to turn LEDs on, POST tx to "
-//                        "toggle LEDs.\","
-//                        "</als>;type=text/plain;title=\"Read the ambient "
-//                        "light sensor reading.\","
-//			"</hash>;type=text/plain;title=\"Emit the SHA-256 hash "
-//			"of the incoming POST data.\"";
-//                    result = otMessageAppend(replyMessage,
-//                            responseData, sizeof(responseData));
-//
-//                    if (result == OT_ERROR_NONE)
-//                    {
-//                        /* All good, now send it */
-//                        result = otCoapSendResponse(
-//                                handlerContext->aInstance, replyMessage,
-//                                aMessageInfo);
-//                    }
-//
-//                    if (result != OT_ERROR_NONE)
-//                    {
-//                        /* There was an issue above, free up the message */
-//                        otMessageFree(replyMessage);
-//                    }
-//                }
-//            }
-//            break;
-//        default:
-//            break;
-//    }
-//}
-
 static void pingHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
     /* Ignore message */
@@ -310,11 +193,6 @@ static void pingHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessa
 
     /* Pick up our context passed in earlier */
     struct CoapUtilHandlerContext *handlerContext = (struct CoapUtilHandlerContext *)aContext;
-
-    otPlatLog(OT_LOG_LEVEL_INFO, OT_LOG_REGION_COAP, "CC: Ping handler coap entered");
-    //#if OPENTHREAD_CONFIG_LOG_API == 1
-    //	otLogInfoApi(handlerContext->aInstance, "CC: ping handler coap entered");
-    //#endif
 
     if (otCoapHeaderGetType(aHeader) != OT_COAP_TYPE_CONFIRMABLE)
     {
@@ -348,9 +226,12 @@ static void pingHandler(void *aContext, otCoapHeader *aHeader, otMessage *aMessa
         if (replyMessage)
         {
             otError result;
-            char    responseData[64];
-            int     len = snprintf(responseData, sizeof(responseData) - 1, "%s", "{\"res\":\"pong\"}");
-            result      = otMessageAppend(replyMessage, responseData, (uint16_t)len);
+            char    responseData[APP_RESPPAYLOAD_SIZE];
+            /*
+             * Constructing the payload of the response
+             */
+            int len = snprintf(responseData, sizeof(responseData) - 1, "%s", "{\"res\":\"pong\"}");
+            result  = otMessageAppend(replyMessage, responseData, (uint16_t)len);
 
             if (result == OT_ERROR_NONE)
             {
@@ -413,46 +294,38 @@ static void identityReplyHandler(struct CoapUtilHandlerContext *handlerContext,
 
     if (replyMessage)
     {
-        otError result;
-
-        //        /*
-        //         * Convert to hexadecimal and append the message.  Do not include the
-        //         * terminating NULL byte in the payload.
-        //         */
-        //        char response[32];
-        //        int len = snprintf(response, sizeof(response)-1,
-        //                "%x", (char)handlerContext->leds);
-        //        result = otMessageAppend(
-        //                replyMessage, response, len
-        //        );
-
+        otError      result;
         otExtAddress extAddress;
+        /*
+         * Getting the eui64 value and ipaddrs of the node using the OT API
+         */
         otLinkGetFactoryAssignedIeeeEui64(handlerContext->aInstance, &extAddress);
-
         const otNetifAddress *addrs = otIp6GetUnicastAddresses(handlerContext->aInstance);
 
-        char ippddrString[64];
+        char ippddrString[APP_IPSTRING_SIZE];
         ippddrString[0] = '\0';
-        otCliUartOutputFormat("Printing ipddr");
+        /*
+         * Looping in all the node's ip addresses
+         */
         for (const otNetifAddress *addr = addrs; addr; addr = addr->mNext)
         {
             if (addr->mScopeOverride == 3 && addr->mRloc == false)
             {
+                /*
+                 * This is the mesh local ipaddr of the node, converting a to string
+                 */
                 snprintf(ippddrString, sizeof(ippddrString) - 1, "%x:%x:%x:%x:%x:%x:%x:%x",
                          HostSwap16(addr->mAddress.mFields.m16[0]), HostSwap16(addr->mAddress.mFields.m16[1]),
                          HostSwap16(addr->mAddress.mFields.m16[2]), HostSwap16(addr->mAddress.mFields.m16[3]),
                          HostSwap16(addr->mAddress.mFields.m16[4]), HostSwap16(addr->mAddress.mFields.m16[5]),
                          HostSwap16(addr->mAddress.mFields.m16[6]), HostSwap16(addr->mAddress.mFields.m16[7]));
-
-                otCliUartOutputFormat("Ip: "
-                                      "(%s,mPrefixLength=%d,mPreferred=%d,valid=%d,mScopeOverrideValid=%d,"
-                                      "mScopeOverride=%d,mRloc=%d,)",
-                                      ippddrString, addr->mPrefixLength, addr->mPreferred, addr->mValid,
-                                      addr->mScopeOverrideValid, addr->mScopeOverride, addr->mRloc);
             }
         }
 
-        char response[200];
+        /*
+         * Constructing the payload of the response
+         */
+        char response[APP_RESPPAYLOAD_SIZE];
         int  len = snprintf(response, sizeof(response) - 1, "{\"eui\":\"%x:%x:%x:%x:%x:%x:%x:%x\",\"ipaddr\":\"%s\"}",
                            extAddress.m8[0], extAddress.m8[1], extAddress.m8[2], extAddress.m8[3], extAddress.m8[4],
                            extAddress.m8[5], extAddress.m8[6], extAddress.m8[7], ippddrString);
