@@ -281,25 +281,6 @@ otError Coap::ProcessRequest(int argc, char *argv[])
     otCoapHeaderGenerateToken(&header, ot::Coap::Header::kDefaultTokenLength);
     SuccessOrExit(error = otCoapHeaderAppendUriPathOptions(&header, coapUri));
 
-    if (argc > 4)
-    {
-        payloadLength = static_cast<uint16_t>(strlen(argv[4]));
-
-        if (payloadLength > 0)
-        {
-            otCoapHeaderSetPayloadMarker(&header);
-        }
-    }
-
-    message = otCoapNewMessage(mInterpreter.mInstance, &header);
-    VerifyOrExit(message != NULL, error = OT_ERROR_NO_BUFS);
-
-    // Embed content into message if given
-    if (payloadLength > 0)
-    {
-        SuccessOrExit(error = otMessageAppend(message, argv[4], payloadLength));
-    }
-
     if (argc > 5)
     {
         // CoAP-Content Format
@@ -341,6 +322,25 @@ otError Coap::ProcessRequest(int argc, char *argv[])
         {
             SuccessOrExit(error = otCoapHeaderAppendContentFormatOption(&header, coapOptionContentFormat));
         }
+    }
+
+    if (argc > 4)
+    {
+        payloadLength = static_cast<uint16_t>(strlen(argv[4]));
+
+        if (payloadLength > 0)
+        {
+            otCoapHeaderSetPayloadMarker(&header);
+        }
+    }
+
+    message = otCoapNewMessage(mInterpreter.mInstance, &header);
+    VerifyOrExit(message != NULL, error = OT_ERROR_NO_BUFS);
+
+    // Embed content into message if given
+    if (payloadLength > 0)
+    {
+        SuccessOrExit(error = otMessageAppend(message, argv[4], payloadLength));
     }
 
     memset(&messageInfo, 0, sizeof(messageInfo));
