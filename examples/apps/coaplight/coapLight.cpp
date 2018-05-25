@@ -225,163 +225,184 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
         int32_t newStep            = -1;
         bool    toggleLevelChanged = false;
         bool    stepChanged        = false;
-        uint8_t status             = 0; // 0 -> Error, 1 -> Ok
+        /*
+         * Instead of defining an enum, will use the following values
+         * (0 -> Error, 1 -> Ok) for status
+         */
+        uint8_t status = 0;
 
         if (!isGet)
         {
-            // If PUT, change light state first
+            /* If PUT, change light level first */
             if (strcmp(path, "light/toggle") == 0)
             {
                 if (handlerContext->lights[0]->level == 0)
                     handlerContext->lights[0]->level = handlerContext->lights[0]->toggleLevel;
                 else
                     handlerContext->lights[0]->level = 0;
-                status = 1; // Ok
+                status = 1;
             }
             if (strcmp(path, "light/up") == 0)
             {
                 int16_t newLevel                 = handlerContext->lights[0]->level + handlerContext->lights[0]->step;
                 handlerContext->lights[0]->level = newLevel > LIGHT_MAX_LEVEL ? LIGHT_MAX_LEVEL : (uint8_t)newLevel;
-                status                           = 1; // Ok
+                status                           = 1;
             }
             if (strcmp(path, "light/down") == 0)
             {
                 int16_t newLevel                 = handlerContext->lights[0]->level - handlerContext->lights[0]->step;
                 handlerContext->lights[0]->level = newLevel < 0 ? 0 : (uint8_t)newLevel;
-                status                           = 1; // Ok
+                status                           = 1;
             }
             if (strcmp(path, "light/set") == 0)
             {
-                // TODO: Check COAP option if payload is JSON
-                // Because of the coap content format appending issue of the request,
-                // We will not check the contentformat to be json and assume that the
-                // payload is a json
                 /*
-                        const otCoapOption *curOption = otCoapHeaderGetFirstOption(aHeader);
-                        uint8_t numOptions = 0;
-                        while(curOption != NULL){
-                            //if(curOption->mLength == 8)
-                                otCliUartOutputFormat("| option{mNumber=%d, mLength=%d, Val=%02X}", curOption->mNumber,
-                curOption->mLength, curOption->mValue[0]); curOption = otCoapHeaderGetNextOption(aHeader); numOptions++;
-                        }
-                otCliUartOutputFormat("Num options = %d", numOptions);
-                */
-                uint16_t payloadLength = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
-                char     buf[APP_REQPAYLOAD_SIZE];
-
-                if (payloadLength <= sizeof(buf) && payloadLength > 0)
+                 * Check for CoAP content format option to check that payload is JSON,
+                 * other content formats or no content format is treated as an error
+                 */
+                bool                isJsonPayload = false;
+                const otCoapOption *curOption     = otCoapHeaderGetFirstOption(aHeader);
+                while (curOption != NULL)
                 {
-                    otMessageRead(aMessage, otMessageGetOffset(aMessage), buf, payloadLength);
-                    coapPayloadMakeStringSafe(buf, payloadLength);
-
-                    // Parsing json
-                    jsmn_parser parser;
-                    jsmntok_t   tokens[APP_JSONPARSING_NUMTOKENS];
-                    jsmn_init(&parser);
-                    int32_t numTokens =
-                        (int32_t)jsmn_parse(&parser, buf, strlen(buf), tokens, APP_JSONPARSING_NUMTOKENS);
-
-                    if (numTokens > 0)
-                    {
-                        if (tokens[0].type == JSMN_OBJECT)
+                    if (curOption->mNumber == OT_COAP_OPTION_CONTENT_FORMAT && curOption->mLength == 1)
+                        if (curOption->mValue[0] == OT_COAP_OPTION_CONTENT_FORMAT_JSON)
                         {
-                            bool checkNextTokens = true;
-                            // Checking the other tokens between start and end of token 0
-                            for (uint8_t i = 1; i < numTokens; i++)
+                            isJsonPayload = true;
+                            break;
+                        }
+                    curOption = otCoapHeaderGetNextOption(aHeader);
+                }
+
+                if (isJsonPayload)
+                {
+                    uint16_t payloadLength = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
+                    char     buf[APP_REQPAYLOAD_SIZE];
+
+                    if (payloadLength <= sizeof(buf) && payloadLength > 0)
+                    {
+                        otMessageRead(aMessage, otMessageGetOffset(aMessage), buf, payloadLength);
+                        coapPayloadMakeStringSafe(buf, payloadLength);
+
+                        /* Parsing the json string */
+                        jsmn_parser parser;
+                        jsmntok_t   tokens[APP_JSONPARSING_NUMTOKENS];
+                        jsmn_init(&parser);
+                        int32_t numTokens =
+                            (int32_t)jsmn_parse(&parser, buf, strlen(buf), tokens, APP_JSONPARSING_NUMTOKENS);
+
+                        if (numTokens > 0)
+                        {
+                            if (tokens[0].type == JSMN_OBJECT)
                             {
-                                if (!(tokens[i].start > tokens[0].start && tokens[i].end < tokens[0].end))
-                                {
-                                    checkNextTokens = false;
-                                    break;
-                                }
-                            }
-                            if (checkNextTokens)
-                            {
-                                // Checking the name values pairs of token to get values
-                                bool    tokenVal      = false;
-                                int32_t attrNameStart = -1;
-                                int32_t attrNameEnd   = -1;
+                                bool checkNextTokens = true;
+                                /*
+                                 * We validate that we have only have a json object with properties by
+                                 * checking the other tokens between start and end of token 0
+                                 */
                                 for (uint8_t i = 1; i < numTokens; i++)
                                 {
-                                    if (!tokenVal)
+                                    if (!(tokens[i].start > tokens[0].start && tokens[i].end < tokens[0].end))
                                     {
-                                        // Processing Attr Name
-                                        if (tokens[i].type != JSMN_STRING)
+                                        checkNextTokens = false;
+                                        break;
+                                    }
+                                }
+                                if (checkNextTokens)
+                                {
+                                    /*
+                                     * Now cycle between name,value of each property of the json object,
+                                     * if we find the attrs 'step' and 'toggleLevel' parse the value to
+                                     * an integer value
+                                     */
+                                    bool    tokenVal      = false;
+                                    int32_t attrNameStart = -1;
+                                    int32_t attrNameEnd   = -1;
+                                    for (uint8_t i = 1; i < numTokens; i++)
+                                    {
+                                        if (!tokenVal)
                                         {
-                                            break;
+                                            /* Processing an attribute name */
+                                            if (tokens[i].type != JSMN_STRING)
+                                            {
+                                                break;
+                                            }
+                                            else
+                                            {
+                                                attrNameStart = (int32_t)tokens[i].start;
+                                                attrNameEnd   = (int32_t)tokens[i].end;
+                                            }
+                                            tokenVal = true;
                                         }
                                         else
                                         {
-                                            attrNameStart = (int32_t)tokens[i].start;
-                                            attrNameEnd   = (int32_t)tokens[i].end;
-                                        }
-                                        tokenVal = true;
-                                    }
-                                    else
-                                    {
-                                        // Processing Attr Value
-                                        if (tokens[i].type != JSMN_PRIMITIVE)
-                                        {
-                                            break;
-                                        }
-                                        if (!(buf[tokens[i].start] == '-' ||
-                                              (buf[tokens[i].start] >= '0' && buf[tokens[i].start] <= '9')))
-                                        {
-                                            // If not a number
-                                            break;
-                                        }
-                                        if (attrNameStart < 0 || attrNameEnd < 0)
-                                            break;
-                                        char attrValString[APP_MAXSTRING_ATTR];
-                                        getSubString(buf, (uint16_t)(tokens[i].start),
-                                                     (uint16_t)(tokens[i].end - tokens[i].start), attrValString);
-                                        char attrNameString[APP_MAXSTRING_ATTR];
-                                        getSubString(buf, (uint16_t)attrNameStart,
-                                                     (uint16_t)(attrNameEnd - attrNameStart), attrNameString);
+                                            /* Processing an attribute value */
+                                            if (tokens[i].type != JSMN_PRIMITIVE)
+                                            {
+                                                break;
+                                            }
+                                            if (!(buf[tokens[i].start] == '-' ||
+                                                  (buf[tokens[i].start] >= '0' && buf[tokens[i].start] <= '9')))
+                                            {
+                                                /* The attribute value is not a number */
+                                                break;
+                                            }
+                                            if (attrNameStart < 0 || attrNameEnd < 0)
+                                                break;
+                                            char attrValString[APP_MAXSTRING_ATTR];
+                                            getSubString(buf, (uint16_t)(tokens[i].start),
+                                                         (uint16_t)(tokens[i].end - tokens[i].start), attrValString);
+                                            char attrNameString[APP_MAXSTRING_ATTR];
+                                            getSubString(buf, (uint16_t)attrNameStart,
+                                                         (uint16_t)(attrNameEnd - attrNameStart), attrNameString);
 
-                                        // From here on, error when processing attr value is only a fail for that attr
-                                        // in the json, continue with the other attrs
-                                        tokenVal      = false;
-                                        attrNameStart = attrNameEnd = -1;
+                                            tokenVal      = false;
+                                            attrNameStart = attrNameEnd = -1;
 
-                                        char *end = attrValString;
+                                            char *end = attrValString;
 
-                                        int32_t val = (int32_t)strtol(attrValString, &end, 10);
-                                        if (*end != '\0')
-                                            continue; // Parse failed
-
-                                        if (strcmp(attrNameString, "step") == 0)
-                                        {
-                                            if (val <= 0 || val > LIGHT_MAX_LEVEL)
+                                            int32_t val = (int32_t)strtol(attrValString, &end, 10);
+                                            /*
+                                             * An error in parsing the attribute value will not result in an error when
+                                             * processing the request, instead will continue processing the other
+                                             * attributes of the json object
+                                             */
+                                            if (*end != '\0')
                                                 continue;
-                                            newStep = val;
-                                        }
-                                        if (strcmp(attrNameString, "toggleLevel") == 0)
-                                        {
-                                            if (val <= 0 || val > LIGHT_MAX_LEVEL)
-                                                continue;
-                                            newToggleLevel = val;
+
+                                            if (strcmp(attrNameString, "step") == 0)
+                                            {
+                                                if (val <= 0 || val > LIGHT_MAX_LEVEL)
+                                                    continue;
+                                                newStep = val;
+                                            }
+                                            if (strcmp(attrNameString, "toggleLevel") == 0)
+                                            {
+                                                if (val <= 0 || val > LIGHT_MAX_LEVEL)
+                                                    continue;
+                                                newToggleLevel = val;
+                                            }
                                         }
                                     }
-                                } // end if (tokenVal == true)
-                            }     // end for tokens[]
-                        }         // end if(tokens[0].type == JSMN_OBJECT)
-                    }             // end if(numTokens > 0)
+                                }
+                            }
+                        }
+                    }
+                }
 
-                } // end if(payloadLength <= sizeof(buf)  && payloadLength>0)
-
-                // Now Try to change values
+                /* Now try to change light properties values */
                 if (newStep < 0 && newToggleLevel < 0)
                 {
-                    // Request payload is not json or json is formatted incorrectly
-                    status = 0; // Errror
+                    /* Request payload is not json or json is formatted incorrectly */
+                    status = 0;
                 }
                 else
                 {
-                    // newStep >= 0 || newToggleLevel >= 0
-                    // At least one attr was processed, return status as Ok
+                    /*
+                     * If newStep or newToggleLevel are > 0, this means that at
+                     * least one attribute was processed, return status as Ok
+                     */
                     status = 1;
-                    // Now try to change values
+                    /* Now try to change value */
                     if (newStep >= 0)
                     {
                         if (newStep != handlerContext->lights[0]->step)
@@ -403,7 +424,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
         }
         int len = 0;
 
-        // Construct response
+        /* Construct response */
         if (isGet)
         {
             len = snprintf(response, sizeof(response) - 1, "{\"level\": %d, \"toggleLevel\": %d, \"step\": %d}",
@@ -411,10 +432,10 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
                            handlerContext->lights[0]->step);
         }
         else
-        { // PUT
+        {
             if (strcmp(path, "light/set") == 0)
             {
-                // Constructing response for light/set
+                /* Constructing response for PUT light/set */
                 char stepBuf[APP_MAXSTRING_ATTRNAMEVAL];
                 stepBuf[0] = '\0';
                 char toogleLevelBuf[APP_MAXSTRING_ATTRNAMEVAL];
@@ -435,7 +456,7 @@ static void lightReplyHandler(struct CoapLightHandlerContext *handlerContext,
             }
             else
             {
-                // light/up, light/down, light/toggle
+                /* Constructing response for PUT light/up, light/down, light/toggle */
                 len = snprintf(response, sizeof(response) - 1, "{\"status\":\"%s\", \"level\":%d}",
                                (status == 1 ? "Ok" : "Error"), handlerContext->lights[0]->level);
             }
