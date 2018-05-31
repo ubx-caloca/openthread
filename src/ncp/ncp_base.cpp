@@ -252,7 +252,7 @@ const NcpBase::PropertyHandlerEntry NcpBase::mGetPropertyHandlerTable[] =
 #endif
 #endif // OPENTHREAD_FTD
 
-#if OPENTHREAD_ENABLE_RAW_LINK_API
+#if OPENTHREAD_RADIO || OPENTHREAD_ENABLE_RAW_LINK_API
     NCP_GET_PROP_HANDLER_ENTRY(MAC_SRC_MATCH_ENABLED),
 #endif
 };
@@ -582,7 +582,7 @@ NcpBase::NcpBase(Instance *aInstance):
     mCurTransmitTID(0),
     mCurScanChannel(kInvalidScanChannel),
     mSrcMatchEnabled(false),
-#endif // OPENTHREAD_ENABLE_RAW_LINK_API
+#endif // OPENTHREAD_RADIO || OPENTHREAD_ENABLE_RAW_LINK_API
 #if OPENTHREAD_MTD || OPENTHREAD_FTD
     mInboundSecureIpFrameCounter(0),
     mInboundInsecureIpFrameCounter(0),
@@ -1305,39 +1305,22 @@ NcpBase::PropertyHandler NcpBase::FindPropertyHandler(spinel_prop_key_t aKey, co
 
 NcpBase::PropertyHandler NcpBase::FindGetPropertyHandler(spinel_prop_key_t aKey)
 {
-    return FindPropertyHandler(
-               aKey,
-               mGetPropertyHandlerTable,
-               sizeof(mGetPropertyHandlerTable) / sizeof(mGetPropertyHandlerTable[0])
-           );
-
+    return FindPropertyHandler(aKey, mGetPropertyHandlerTable, OT_ARRAY_LENGTH(mGetPropertyHandlerTable));
 }
 
 NcpBase::PropertyHandler NcpBase::FindSetPropertyHandler(spinel_prop_key_t aKey)
 {
-    return FindPropertyHandler(
-               aKey,
-               mSetPropertyHandlerTable,
-               sizeof(mSetPropertyHandlerTable) / sizeof(mSetPropertyHandlerTable[0])
-           );
+    return FindPropertyHandler(aKey, mSetPropertyHandlerTable, OT_ARRAY_LENGTH(mSetPropertyHandlerTable));
 }
 
 NcpBase::PropertyHandler NcpBase::FindInsertPropertyHandler(spinel_prop_key_t aKey)
 {
-   return FindPropertyHandler(
-               aKey,
-               mInsertPropertyHandlerTable,
-               sizeof(mInsertPropertyHandlerTable) / sizeof(mInsertPropertyHandlerTable[0])
-           );
+   return FindPropertyHandler(aKey, mInsertPropertyHandlerTable, OT_ARRAY_LENGTH(mInsertPropertyHandlerTable));
 }
 
 NcpBase::PropertyHandler NcpBase::FindRemovePropertyHandler(spinel_prop_key_t aKey)
 {
-    return FindPropertyHandler(
-               aKey,
-               mRemovePropertyHandlerTable,
-               sizeof(mRemovePropertyHandlerTable) / sizeof(mRemovePropertyHandlerTable[0])
-           );
+    return FindPropertyHandler(aKey, mRemovePropertyHandlerTable, OT_ARRAY_LENGTH(mRemovePropertyHandlerTable));
 }
 
 // Returns `true` and updates the `aError` on success.
@@ -1383,7 +1366,13 @@ otError NcpBase::HandleCommandPropertySet(uint8_t aHeader, spinel_prop_key_t aKe
     otError error = OT_ERROR_NONE;
     PropertyHandler handler = FindSetPropertyHandler(aKey);
 
-    if (handler == NULL)
+    if (handler != NULL)
+    {
+        mDisableStreamWrite = false;
+        error = (this->*handler)();
+        mDisableStreamWrite = true;
+    }
+    else
     {
         // If there is no "set" handler, check if this property is one of the
         // ones that require different treatment.
@@ -1392,14 +1381,25 @@ otError NcpBase::HandleCommandPropertySet(uint8_t aHeader, spinel_prop_key_t aKe
 
         VerifyOrExit(!didHandle);
 
-        ExitNow(error = PrepareLastStatusResponse(aHeader, SPINEL_STATUS_PROP_NOT_FOUND));
+#if OPENTHREAD_ENABLE_NCP_VENDOR_HOOK
+        if (aKey >= SPINEL_PROP_VENDOR__BEGIN && aKey < SPINEL_PROP_VENDOR__END)
+        {
+            mDisableStreamWrite = false;
+            error = VendorSetPropertyHandler(aKey);
+            mDisableStreamWrite = true;
+
+            // An `OT_ERROR_NOT_FOUND` status from vendor handler indicates
+            // that it does not support the given property key. In that
+            // case, `didHandle` is set to `false` so a `LAST_STATUS` with
+            // `PROP_NOT_FOUND` is emitted. Otherwise, we fall through to
+            // prepare the response.
+
+            didHandle = (error != OT_ERROR_NOT_FOUND);
+        }
+#endif
+
+        VerifyOrExit(didHandle, error = PrepareLastStatusResponse(aHeader, SPINEL_STATUS_PROP_NOT_FOUND));
     }
-
-    mDisableStreamWrite = false;
-
-    error = (this->*handler)();
-
-    mDisableStreamWrite = true;
 
     if (error == OT_ERROR_NONE)
     {
@@ -1504,6 +1504,25 @@ otError NcpBase::WritePropertyValueIsFrame(uint8_t aHeader, spinel_prop_key_t aP
         SuccessOrExit(error = (this->*handler)());
         ExitNow(error = mEncoder.EndFrame());
     }
+
+#if OPENTHREAD_ENABLE_NCP_VENDOR_HOOK
+    if (aPropKey >= SPINEL_PROP_VENDOR__BEGIN && aPropKey < SPINEL_PROP_VENDOR__END)
+    {
+        SuccessOrExit(error = mEncoder.BeginFrame(aHeader, SPINEL_CMD_PROP_VALUE_IS, aPropKey));
+
+        error = VendorGetPropertyHandler(aPropKey);
+
+        // An `OT_ERROR_NOT_FOUND` status from vendor handler indicates that
+        // it did not support the given property key. In that case, we fall
+        // through to prepare a `LAST_STATUS` response.
+
+        if (error != OT_ERROR_NOT_FOUND)
+        {
+            SuccessOrExit(error);
+            ExitNow(error = mEncoder.EndFrame());
+        }
+    }
+#endif
 
     if (aIsGetResponse)
     {
@@ -1700,7 +1719,7 @@ exit:
 
 otError NcpBase::GetPropertyHandler_PHY_ENABLED(void)
 {
-#if OPENTHREAD_ENABLE_RAW_LINK_API
+#if OPENTHREAD_RADIO || OPENTHREAD_ENABLE_RAW_LINK_API
         return mEncoder.WriteBool(otLinkRawIsEnabled(mInstance));
 #else
         return mEncoder.WriteBool(false);
